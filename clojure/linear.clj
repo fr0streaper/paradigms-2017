@@ -10,11 +10,16 @@
 
 (defn checkMatrixes [ms]
   (and (apply = (conj (mapv checkVectors ms) true))
-       (fn []
-         (loop [ind 0 n (count ms) res true]
-           (if (= ind (dec n))
-             res
-             (recur (inc ind) n (and res (= (count (get ind ms)) (count (first (get (inc ind) ms)))))))))))
+       (apply = (mapv count ms))
+       (apply = (mapv (fn [x] (count (first x))) ms))))
+
+(defn checkMatrixesForMultiplication [ms]
+  (and (apply = (conj (mapv checkVectors ms) true))
+       (loop [ind 0 n (count ms) res true]
+         (if (= ind (dec n))
+           res
+           (recur (inc ind) n (and res (= (count (first (get ms ind)))
+                                          (count (get ms (inc ind))))))))))
 
 (defn coordinateVectorApply [f & args]
   { :pre [(checkVectors args) (> (count args) 0)] }
@@ -134,7 +139,7 @@
   (mapv (fn [x] (scalar x v)) m))
 
 (defn m*m [& args]
-  { :pre [(checkMatrixes args)] }
+  { :pre [(checkMatrixesForMultiplication args)] }
   (foldLeft
     (first args)
     (fn [x y]
@@ -157,6 +162,3 @@
 (defn b* [& args]
   { :pre [(checkTensors args)] }
   (apply coordinateTensorApply * args))
-
-
-
