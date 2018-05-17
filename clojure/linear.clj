@@ -47,7 +47,9 @@
    (checkTensor x (getForm x)))
   ([x form]
    (cond
-     (number? x) true
+     (and (empty? form) (number? x)) true
+     (or (and (empty? form) (not (number? x)))
+         (and (not (empty? form)) (number? x))) false
      :else (apply = (conj (mapv (fn [p] (checkTensor p (rest form))) x) (= (count x) (first form)) true)))))
 
 (defn checkTensors [args]
