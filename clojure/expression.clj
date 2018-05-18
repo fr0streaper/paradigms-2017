@@ -13,18 +13,22 @@
 (def subtract (operation -))
 (def multiply (operation *))
 (def divide (operation (fn [x y] (/ (double x) (double y)))))
-(def negate (operation -))
+(def negate (operation (fn [x] (- x))))
+(def sinh (operation (fn [x] (Math/sinh x))))
+(def cosh (operation (fn [x] (Math/cosh x))))
 
-(def op
+(def operations
   { '+ add
    '- subtract
    '* multiply
    '/ divide
    'negate negate
+   'sinh sinh
+   'cosh cosh
    })
 (defn parseFunction [expr]
   (cond
     (number? expr) (constant expr)
     (symbol? expr) (variable (str expr))
     (string? expr) (parseFunction (read-string expr))
-    (seq? expr) (apply (get op (first expr)) (mapv parseFunction (rest expr)))))
+    (seq? expr) (apply (get operations (first expr)) (mapv parseFunction (rest expr)))))
