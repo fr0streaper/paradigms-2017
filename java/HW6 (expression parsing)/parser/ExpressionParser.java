@@ -1,13 +1,12 @@
-package parser;
+package expression.parser;
 
 import expression.*;
 
 public class ExpressionParser implements Parser {
-  private String expression;
-  private char name;
+  private String expression, name;
   private int ind, value;
 
-  private enum Token {LB, RB, MINUS, SUB, ADD, DIV, MUL, CONST, VAR, ERR, END, AND, OR, XOR, NOT, CNT};
+  private enum Token {LB, RB, MINUS, SUB, ADD, DIV, MUL, CONST, VAR, ERR, END, AND, OR, XOR, NOT, CNT}
 
   private Token token;
 
@@ -29,10 +28,11 @@ public class ExpressionParser implements Parser {
         token = Token.ADD;
         break;
       case '-':
-        if (token == Token.CONST || token == Token.VAR || token == Token.RB || token == Token.ERR)
+        if (token == Token.CONST || token == Token.VAR || token == Token.RB) {
           token = Token.SUB;
-        else
+        } else {
           token = Token.MINUS;
+        }
         break;
       case '*':
         token = Token.MUL;
@@ -40,17 +40,13 @@ public class ExpressionParser implements Parser {
       case '/':
         token = Token.DIV;
         break;
-      case 'x': case 'y': case 'z':
-        token = Token.VAR;
-        name = curr;
-        break;
-      case '&': 
+      case '&':
         token = Token.AND;
         break;
       case '|':
         token = Token.OR;
         break;
-      case '^': 
+      case '^':
         token = Token.XOR;
         break;
       case '~':
@@ -62,17 +58,22 @@ public class ExpressionParser implements Parser {
           while (ind < expression.length() && Character.isDigit(expression.charAt(ind))) {
             ind++;
           }
-          int right = ind;
 
           token = Token.CONST;
-          value = Integer.parseUnsignedInt(expression.substring(left, right));
+          value = Integer.parseUnsignedInt(expression.substring(left, ind));
           ind--;
-        }
-        else if (ind + 5 <= expression.length() && expression.substring(ind, ind + 5).equals("count")) {
+        } else if (ind + 5 <= expression.length() && expression.substring(ind, ind + 5).equals("count")) {
           token = Token.CNT;
-        }
-        else {
-          token = Token.ERR;
+          ind += 4;
+        } else {
+          int left = ind;
+          while (ind < expression.length() && Character.isLetter(expression.charAt(ind))) {
+            ind++;
+          }
+
+          token = Token.VAR;
+          name = expression.substring(left, ind);
+          ind--;
         }
     }
     ind++;
@@ -83,13 +84,15 @@ public class ExpressionParser implements Parser {
 
     switch (token) {
       case CONST:
+        getToken();
         return new Const(value);
       case VAR:
+        getToken();
         return new Variable(name);
       case MINUS:
         return new Minus(priority1());
       case LB:
-        GenericExpression res = priority3();
+        GenericExpression res = priority_or();
         getToken();
         return res;
       case NOT:
@@ -104,7 +107,7 @@ public class ExpressionParser implements Parser {
 
   private GenericExpression priority2() {
     GenericExpression expr = priority1();
-  
+
     for (; ; ) {
       switch (token) {
         case MUL:
@@ -121,8 +124,8 @@ public class ExpressionParser implements Parser {
 
   private GenericExpression priority3() {
     GenericExpression expr = priority2();
-  
-    for(; ; ) {
+
+    for (; ; ) {
       switch (token) {
         case ADD:
           expr = new Add(expr, priority2());
@@ -156,7 +159,7 @@ public class ExpressionParser implements Parser {
     for (; ; ) {
       switch (token) {
         case XOR:
-          expr = new And(expr, priority_and());
+          expr = new Xor(expr, priority_and());
           break;
         default:
           return expr;
@@ -170,7 +173,7 @@ public class ExpressionParser implements Parser {
     for (; ; ) {
       switch (token) {
         case OR:
-          expr = new And(expr, priority_xor());
+          expr = new Or(expr, priority_xor());
           break;
         default:
           return expr;
@@ -179,9 +182,9 @@ public class ExpressionParser implements Parser {
   }
 
   public TripleExpression parse(String expression) {
-    expression = expression.replaceAll("\\s+", "");
+    this.expression = expression.replaceAll("\\s+", "");
     ind = 0;
     token = Token.ERR;
-    return (TripleExpression)priority_or();
+    return priority_or();
   }
 }
