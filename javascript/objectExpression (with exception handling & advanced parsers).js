@@ -21,111 +21,36 @@ function defineException(name) {
 
 defineException.prototype = Exception.prototype;
 
-function wrapException(name, messageCreator) {
+function messageCreator(message) {
+    return function (expr, id) {
+        return message + ' ' + id + '\n' + expr + '\n' + pointToError(id);
+    };
+}
+
+function wrapException(name, message) {
     var result = function () {
         var args = arguments;
-        Exception.call(this, messageCreator.apply(null, args));
+        Exception.call(this, messageCreator(message).apply(null, args));
     };
     result.prototype = new defineException(name);
     return result;
 }
 
-var ExtraParenthesisException = wrapException(
-    'ExtraParenthesisException',
-    function (expr, id) {
-        return (
-            'Extra parenthesis at position ' +
-            id +
-            '\n' +
-            expr +
-            '\n' +
-            pointToError(id)
-        );
-    }
-);
+var ExtraParenthesisException = wrapException('ExtraParenthesisException', 'Extra parenthesis at position');
 
-var MissingParenthesisException = wrapException(
-    'MissingParenthesisException',
-    function (expr, id) {
-        return (
-            'Missing parenthesis at position ' +
-            id +
-            '\n' +
-            expr +
-            '\n' +
-            pointToError(id)
-        );
-    }
-);
+var MissingParenthesisException = wrapException('MissingParenthesisException', 'Missing parenthesis at position');
 
-var ExtraOperatorException = wrapException('ExtraOperatorException', function (
-    expr,
-    id
-) {
-    return (
-        'Extra operator at position ' + id + '\n' + expr + '\n' + pointToError(id)
-    );
-});
+var ExtraOperatorException = wrapException('ExtraOperatorException', 'Extra operator at position');
 
-var MissingOperatorException = wrapException(
-    'MissingOperatorException',
-    function (expr, id) {
-        return (
-            'Missing operator at position ' +
-            id +
-            '\n' +
-            expr +
-            '\n' +
-            pointToError(id)
-        );
-    }
-);
+var MissingOperatorException = wrapException('MissingOperatorException', 'Missing operator at position');
 
-var ExtraOperandException = wrapException('ExtraOperandException', function (
-    expr,
-    id
-) {
-    return (
-        'Extra operand at position ' + id + '\n' + expr + '\n' + pointToError(id)
-    );
-});
+var ExtraOperandException = wrapException('ExtraOperandException', 'Extra operand at position');
 
-var MissingOperandException = wrapException('MissingOperandException', function (
-    expr,
-    id
-) {
-    return (
-        'Missing operand at position ' + id + '\n' + expr + '\n' + pointToError(id)
-    );
-});
+var MissingOperandException = wrapException('MissingOperandException', 'Missing operand at position');
 
-var UnknownIdentifierException = wrapException(
-    'UnknownIdentifierException',
-    function (expr, id) {
-        return (
-            'Unknown identifier at position ' +
-            id +
-            '\n' +
-            expr +
-            '\n' +
-            pointToError(id)
-        );
-    }
-);
+var UnknownIdentifierException = wrapException('UnknownIdentifierException', 'Unknown identifier at position');
 
-var UnexpectedEndOfInputException = wrapException(
-    'UnexpectedEndOfInputException',
-    function (expr, id) {
-        return (
-            'Unexpected end of input at position ' +
-            id +
-            '\n' +
-            expr +
-            '\n' +
-            pointToError(id)
-        );
-    }
-);
+var UnexpectedEndOfInputException = wrapException('UnexpectedEndOfInputException', 'Unexpected end of input at position');
 
 // --- Expressions ---
 

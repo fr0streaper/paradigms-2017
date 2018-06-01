@@ -100,16 +100,16 @@
     (fn [x] (Math/sin x))
     "sin"
     (fn [this v]
-      (Multiply (Cos (operands this))
-                (diff (operands this) v)))))
+      (Multiply (Cos (nth (operands this) 0))
+                (diff (nth (operands this) 0) v)))))
 
 (def Cos
   (Operation
     (fn [x] (Math/cos x))
     "cos"
     (fn [this v]
-      (Negate (Multiply (Sin (operands this))
-                        (diff (operands this) v))))))
+      (Negate (Multiply (Sin (nth (operands this) 0))
+                        (diff (nth (operands this) 0) v))))))
 
 ; --- default parser ---
 
@@ -136,95 +136,92 @@
 (def ind (atom 0))
 (def token (atom ""))
 
-(defn whitespace? [s]
-    (not (empty? (re-matches #"\s" (str s)))))
+(defn whitespace? [s] (not (empty? (re-matches #"\s" (str s)))))
 
-(defn digit? [x]
-    (not (empty? (re-matches #"\d" (str x)))))
+(defn digit? [x] (not (empty? (re-matches #"\d" (str x)))))
 
-(defn variable? [x]
-    (not (empty? (re-matches #"[xyz]" (str x)))))
+(defn variable? [x] (not (empty? (re-matches #"[xyz]" (str x)))))
 
-(defn retrieve []
-    (subs expr @ind (inc @ind)))
+(defn retrieve [] (subs expr @ind (inc @ind)))
 
-(defn increment []
-    (swap! ind inc))
+(defn increment [] (swap! ind inc))
 
 (defn getIdentifier []
-    (if (or (= @ind (count expr)) (whitespace? (retrieve)))
-        ""
-        (do (increment) (str " " (getIdentifier)))))
-    
+  (if (or (= @ind (count expr)) (whitespace? (retrieve)))
+    ""
+    (do (increment) (str " " (getIdentifier)))))
+
 (defn getNumber
-    ([] (getNumber 0))
-    ([acc] 
-        (if (or (= @ind (count expr)) (whitespace? (retrieve)) (not (digit? (retrieve))))
-            acc
-            (let [currInd @ind]
-                 (do
-                     (increment)
-                     (getNumber (+ (* 10 acc) (- (int (get expr currInd)) 48))))))))
+  ([] (getNumber 0))
+  ([acc]
+   (if (or (= @ind (count expr)) (whitespace? (retrieve)) (not (digit? (retrieve))))
+     acc
+     (let [currInd @ind]
+       (do
+         (increment)
+         (getNumber (+ (* 10 acc) (- (int (get expr currInd)) 48))))))))
 
 (defn getVariable []
-    (let [res (retrieve)]
-         (do
-             (increment)
-             res)))
-         
+  (let [res (retrieve)]
+    (do
+      (increment)
+      res)))
+
 (defn skipWhitespace []
-    (if (or (= @ind (count expr)) (not (whitespace? (retrieve))))
-        nil
-        (do (increment) (skipWhitespace))))
+  (if (or (= @ind (count expr)) (not (whitespace? (retrieve))))
+    nil
+    (do (increment) (skipWhitespace))))
+
+(def infixOperations { "+" "ADD" "-" "SUB" "*" "MUL" "/" "DIV" "(" "LB" ")" "RB" "negate" "NEG" "sin" "SIN" "cos" "COS"})
+(def infixPriority { "NUM" 0 "VAR" 0 "LB" 0 "NEG" 0 "SIN" 0 "COS" 0 "MUL" 1 "DIV" 1 "ADD" 2 "SUB" 2})
 
 (defn getToken []
-    (do
-        (skipWhitespace)
-    (cond
-        (= @ind (count expr)) nil
-        (= (retrieve) "+") (do (reset! token "ADD") (increment))
-        (= (retrieve) "-") (do (reset! token "SUB") (increment))
-        (= (retrieve) "*") (do (reset! token "MUL") (increment))
-        (= (retrieve) "/") (do (reset! token "DIV") (increment))
-        (= (retrieve) "(") (do (reset! token "LB") (increment))
-        (= (retrieve) ")") (do (reset! token "RB") (increment))
-        (digit? (retrieve)) (reset! token "NUM")
-        (variable? (retrieve)) (reset! token "VAR")
-        :else (let [id (getIdentifier)]
-                   (cond
-                       (= id "negate") (do (reset! token "NEG") (swap! ind #(+ % 6)))
-                       (= id "sin") (do (reset! token "SIN") (swap! ind #(+ % 3)))
-                       (= id "cos") (do (reset! token "COS") (swap! ind #(+ % 3))))))))
-
-(defn priority3 [])
-
-(defn priority1 []
   (do
-      (getToken)
-      (cond
-          (= @token "NUM") (let [res (Constant (getNumber))] (do (getToken) res))
-          (= @token "VAR") (let [res (Variable (getVariable))] (do (getToken) res))
-          (= @token "LB") (let [res (priority3)] (do (getToken) res))
-          (= @token "NEG") (Negate (priority1))
-          (= @token "SIN") (Sin (priority1))
-          (= @token "COS") (Cos (priority1)))))
-      
+    (skipWhitespace)
+    (cond
+      (= @ind (count expr)) nil
+      (contains? infixOperations (retrieve)) (do (reset! token (get infixOperations (retrieve))) (increment))
+      (digit? (retrieve)) (reset! token "NUM")
+      (variable? (retrieve)) (reset! token "VAR")
+      :else (do (reset! token (get infixOperations (getIdentifier))) (swap! ind #(+ % (count (getIdentifier))))))))
 
-(defn priority2 
-    ([] (priority2 (priority1)))
-    ([res]
-        (cond
-           (= @token "MUL") (priority2 (Multiply res (priority1)))
-           (= @token "DIV") (priority2 (Divide res (priority1)))
-           :else res)))
-
-(defn priority3
-    ([] (priority3 (priority2)))
-    ([res]
-        (cond
-            (= @token "ADD") (priority3 (Add res (priority2)))
-            (= @token "SUB") (priority3 (Subtract res (priority2)))
-            :else res)))
+(defn priorityParse
+  ([] (priorityParse 2 nil))
+  ([priority res]
+   (cond
+     (= priority 2)
+     (cond
+       (= @token "ADD") (priorityParse 2 (Add res (priorityParse 1)))
+       (= @token "SUB") (priorityParse 2 (Subtract res (priorityParse 1)))
+       :else res)
+     (= priority 1)
+     (cond
+       (= @token "MUL") (priorityParse 1 (Multiply res (priorityParse 0)))
+       (= @token "DIV") (priorityParse 1 (Divide res (priorityParse 0)))
+       :else res)
+     :else
+     (do (getToken)
+         (cond
+           (= @token "NUM") (let [res (Constant (getNumber))] (do (getToken) res))
+           (= @token "VAR") (let [res (Variable (getVariable))] (do (getToken) res))
+           (= @token "LB") (let [res (priorityParse)] (do (getToken) res))
+           (= @token "NEG") (Negate (priorityParse 0 nil))
+           (= @token "SIN") (Sin (priorityParse 0 nil))
+           (= @token "COS") (Cos (priorityParse 0 nil)))))))
 
 (defn parseObjectInfix [expression]
-  (do (def expr expression) (priority3)))
+  (do (def expr expression) (priorityParse)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
