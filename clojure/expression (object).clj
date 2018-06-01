@@ -137,83 +137,94 @@
 (def token (atom ""))
 
 (defn whitespace? [s]
-  (not (empty? (re-matches #"\s" (str s)))))
+    (not (empty? (re-matches #"\s" (str s)))))
+
+(defn digit? [x]
+    (not (empty? (re-matches #"\d" (str x)))))
+
+(defn variable? [x]
+    (not (empty? (re-matches #"[xyz]" (str x)))))
 
 (defn retrieve []
-  (subs expr @ind (inc @ind)))
+    (subs expr @ind (inc @ind)))
 
 (defn increment []
-  (swap! ind inc))
+    (swap! ind inc))
 
 (defn getIdentifier []
-  (if (or (= @ind (count expr)) (whitespace? (retrieve)))
-    ""
-    (do (increment) (str " " (getIdentifier)))))
-
+    (if (or (= @ind (count expr)) (whitespace? (retrieve)))
+        ""
+        (do (increment) (str " " (getIdentifier)))))
+    
 (defn getNumber
-  ([] (getNumber 0))
-  ([acc]
-   (if (or (= @ind (count expr)) (whitespace? (retrieve)))
-     acc
-     (let [currInd @ind]
-       (do
-         (increment)
-         (getNumber (+ (* 10 acc) (- (int (get expr currInd)) 48))))))))
+    ([] (getNumber 0))
+    ([acc] 
+        (if (or (= @ind (count expr)) (whitespace? (retrieve)) (not (digit? (retrieve))))
+            acc
+            (let [currInd @ind]
+                 (do
+                     (increment)
+                     (getNumber (+ (* 10 acc) (- (int (get expr currInd)) 48))))))))
 
 (defn getVariable []
-  (let [res (retrieve)]
-    (do
-      (increment)
-      res)))
-
+    (let [res (retrieve)]
+         (do
+             (increment)
+             res)))
+         
 (defn skipWhitespace []
-  (if (or (= @ind (count expr)) (not (whitespace? (retrieve))))
-    nil
-    (do (increment) (skipWhitespace))))
+    (if (or (= @ind (count expr)) (not (whitespace? (retrieve))))
+        nil
+        (do (increment) (skipWhitespace))))
 
 (defn getToken []
-  (do
-    (skipWhitespace)
+    (do
+        (skipWhitespace)
     (cond
-      (= @ind (count expr)) nil
-      (= (retrieve) "+") (do (reset! token "ADD") (increment))
-      (= (retrieve) "-") (do (reset! token "SUB") (increment))
-      (= (retrieve) "*") (do (reset! token "MUL") (increment))
-      (= (retrieve) "/") (do (reset! token "DIV") (increment))
-      (not (empty? (re-matches #"\d" (str (retrieve))))) (reset! token "NUM")
-      (not (empty? (re-matches #"[xyz]" (str (retrieve))))) (reset! token "VAR")
-      :else (let [id (getIdentifier)]
-              (cond
-                (= id "negate") (do (reset! token "NEG") (swap! ind #(+ % 6)))
-                (= id "sin") (do (reset! token "SIN") (swap! ind #(+ % 3)))
-                (= id "cos") (do (reset! token "COS") (swap! ind #(+ % 3))))))))
+        (= @ind (count expr)) nil
+        (= (retrieve) "+") (do (reset! token "ADD") (increment))
+        (= (retrieve) "-") (do (reset! token "SUB") (increment))
+        (= (retrieve) "*") (do (reset! token "MUL") (increment))
+        (= (retrieve) "/") (do (reset! token "DIV") (increment))
+        (= (retrieve) "(") (do (reset! token "LB") (increment))
+        (= (retrieve) ")") (do (reset! token "RB") (increment))
+        (digit? (retrieve)) (reset! token "NUM")
+        (variable? (retrieve)) (reset! token "VAR")
+        :else (let [id (getIdentifier)]
+                   (cond
+                       (= id "negate") (do (reset! token "NEG") (swap! ind #(+ % 6)))
+                       (= id "sin") (do (reset! token "SIN") (swap! ind #(+ % 3)))
+                       (= id "cos") (do (reset! token "COS") (swap! ind #(+ % 3))))))))
+
+(defn priority3 [])
 
 (defn priority1 []
   (do
-    (getToken)
-    (cond
-      (= @token "NUM") (let [res (Constant (getNumber))] (do (getToken) res))
-      (= @token "VAR") (let [res (Variable (getVariable))] (do (getToken) res))
-      (= @token "NEG") (Negate (priority1))
-      (= @token "SIN") (Sin (priority1))
-      (= @token "COS") (Cos (priority1)))))
+      (getToken)
+      (cond
+          (= @token "NUM") (let [res (Constant (getNumber))] (do (getToken) res))
+          (= @token "VAR") (let [res (Variable (getVariable))] (do (getToken) res))
+          (= @token "LB") (let [res (priority3)] (do (getToken) res))
+          (= @token "NEG") (Negate (priority1))
+          (= @token "SIN") (Sin (priority1))
+          (= @token "COS") (Cos (priority1)))))
+      
 
-
-(defn priority2
-  ([] (priority2 (priority1)))
-  ([res]
-   (cond
-     (= @token "MUL") (priority2 (Multiply res (priority1)))
-     (= @token "DIV") (priority2 (Divide res (priority1)))
-     :else res)))
+(defn priority2 
+    ([] (priority2 (priority1)))
+    ([res]
+        (cond
+           (= @token "MUL") (priority2 (Multiply res (priority1)))
+           (= @token "DIV") (priority2 (Divide res (priority1)))
+           :else res)))
 
 (defn priority3
-  ([] (priority3 (priority2)))
-  ([res]
-   (cond
-     (= @token "ADD") (priority3 (Add res (priority2)))
-     (= @token "SUB") (priority3 (Subtract res (priority2)))
-     :else res)))
+    ([] (priority3 (priority2)))
+    ([res]
+        (cond
+            (= @token "ADD") (priority3 (Add res (priority2)))
+            (= @token "SUB") (priority3 (Subtract res (priority2)))
+            :else res)))
 
 (defn parseObjectInfix [expression]
   (do (def expr expression) (priority3)))
